@@ -25,7 +25,7 @@ fn main() {
 
         // Check if circuit is the identity and not empty
         let c_iden = Circuit::new(nqubits);
-        if compare_tensors(&c_new, &c_iden) && c_iden != c_new {
+        if compare_tensors(&c_new, &c_iden) && c_new.num_gates() != 0 {
             // Save circuit to file
             let qasm = c_new.to_qasm();
             let mut hasher = DefaultHasher::new();
@@ -45,5 +45,46 @@ fn main() {
             nqubits,
             time.elapsed()
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn every_circuit_is_identity_and_unsimplifiable() {
+        // Iterate through every circuit size
+        for nqubits in 2..8 {
+            let path_str = format!("circuits/{}", nqubits);
+            let path = Path::new(&path_str);
+
+            // Iterate through every circuit
+            for entry in fs::read_dir(path).unwrap() {
+                let entry = entry.unwrap();
+                let file_path = entry.path();
+                let file_path_str = format!("{}", file_path.display());
+                let c_old = Circuit::from_file(&file_path_str).unwrap();
+
+                // Check if the circuit simplifies to the identity
+                let mut g: Graph = c_old.to_graph();
+                full_simp(&mut g);
+                let c_new = g.to_circuit().unwrap();
+                assert!(
+                    c_new.num_gates() != 0,
+                    "The circuit {} is fully simplifiable.",
+                    file_path_str
+                );
+
+                // Check if the circuit is actually the identity
+                let c_iden = Circuit::new(nqubits);
+                assert!(
+                    compare_tensors(&c_old, &c_iden),
+                    "The circuit {} is not the identity.",
+                    file_path_str
+                );
+            }
+        }
     }
 }
